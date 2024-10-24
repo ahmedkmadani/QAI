@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hello World</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <h1 class="mt-5">Hello World!</h1>
+        <p>Welcome to my QA Assistant AI Agent, QAI.</p>
+        
+        <!-- Form for Bug Title -->
+        <form id="bugForm" action="/" method="POST">
+            <div class="form-group">
+                <label for="bugTitle">Bug Title</label>
+                <input type="text" class="form-control" id="bugTitle" name="bugTitle" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Submit</button>
+        </form>
+        
+        <!-- Response Message -->
+        <div id="responseMessage" class="mt-3">
+            {% if response %}
+                <div class="alert alert-info">
+                    <h5>Description:</h5>
+                    <p id="description"></p>
+
+                    <h5>Expected Result:</h5>
+                    <p id="expectedResult"></p>
+
+                    <h5>Actual Result:</h5>
+                    <p id="actualResult"></p>
+
+                    <h5>System Acceptance Criteria:</h5>
+                    <ul id="acceptanceCriteriaList"></ul>
+                </div>  <!-- Display response from Flask -->
+            {% else %}
+                <div class="alert alert-warning">
+                    <p>No response available. Please submit a bug title to generate a report.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+    <!-- Bootstrap JS and dependencies -->
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.2/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script>
+        // Check if response is defined and not None
+        {% if response %}
+            const response = {
+                description: {{ response.description|tojson|safe }},
+                expected_result: {{ response.expected_result|tojson|safe }},
+                actual_result: {{ response.actual_result|tojson|safe }},
+                system_acceptance_criteria: {{ response.system_acceptance_criteria|tojson|safe }}
+            };
+        {% else %}
+            const response = {
+                description: "",
+                expected_result: "",
+                actual_result: "",
+                system_acceptance_criteria: []
+            };
+        {% endif %}
+
+        // Function to simulate typing effect
+        function typeText(elementId, text, delay) {
+            const element = document.getElementById(elementId);
+            let index = 0;
+
+            function type() {
+                if (index < text.length) {
+                    element.innerHTML += text.charAt(index);
+                    index++;
+                    setTimeout(type, delay);
+                }
+            }
+            type();
+        }
+
+        // Only type out sections if response is not empty
+        if (response.description) {
+            typeText('description', response.description, 50);
+        }
+        if (response.expected_result) {
+            setTimeout(() => typeText('expectedResult', response.expected_result, 50), response.description.length * 50 + 500);
+        }
+        if (response.actual_result) {
+            setTimeout(() => typeText('actualResult', response.actual_result, 50), (response.description.length + response.expected_result.length) * 50 + 1000);
+        }
+
+        // Type out the acceptance criteria if it exists
+        const criteriaList = document.getElementById('acceptanceCriteriaList');
+        if (response.system_acceptance_criteria && response.system_acceptance_criteria.length > 0) {
+            response.system_acceptance_criteria.forEach((criterion, index) => {
+                setTimeout(() => {
+                    const li = document.createElement('li');
+                    li.innerText = criterion;
+                    criteriaList.appendChild(li);
+                }, (response.description.length + response.expected_result.length + response.actual_result.length) * 50 + 1500 + index * 500);
+            });
+        }
+    </script>
+</body>
+</html>
