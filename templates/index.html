@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hello World</title>
+    <title>Hello World!</title>
     <!-- Bootstrap CSS -->
     <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
 </head>
@@ -25,6 +25,9 @@
         <div id="responseMessage" class="mt-3">
             {% if response %}
                 <div class="alert alert-info">
+                    <h5>Bug Title:</h5>
+                    <p id="bugTitleDisplay"></p>
+
                     <h5>Description:</h5>
                     <p id="description"></p>
 
@@ -33,6 +36,9 @@
 
                     <h5>Actual Result:</h5>
                     <p id="actualResult"></p>
+
+                    <h5>Reproduction Steps:</h5>
+                    <ul id="reproduceStepsList"></ul>
 
                     <h5>System Acceptance Criteria:</h5>
                     <ul id="acceptanceCriteriaList"></ul>
@@ -44,6 +50,7 @@
             {% endif %}
         </div>
     </div>
+
     <!-- Bootstrap JS and dependencies -->
     <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.2/dist/umd/popper.min.js"></script>
@@ -52,16 +59,20 @@
         // Check if response is defined and not None
         {% if response %}
             const response = {
+                title: {{ response.title|tojson|safe }},
                 description: {{ response.description|tojson|safe }},
                 expected_result: {{ response.expected_result|tojson|safe }},
                 actual_result: {{ response.actual_result|tojson|safe }},
+                reproduce_steps: {{ response.reproduce_steps|tojson|safe }},
                 system_acceptance_criteria: {{ response.system_acceptance_criteria|tojson|safe }}
             };
         {% else %}
             const response = {
+                title: "",
                 description: "",
                 expected_result: "",
                 actual_result: "",
+                reproduce_steps: [],
                 system_acceptance_criteria: []
             };
         {% endif %}
@@ -81,6 +92,11 @@
             type();
         }
 
+        // Display the bug title
+        if (response.title) {
+            typeText('bugTitleDisplay', response.title, 50);
+        }
+
         // Only type out sections if response is not empty
         if (response.description) {
             typeText('description', response.description, 50);
@@ -90,6 +106,18 @@
         }
         if (response.actual_result) {
             setTimeout(() => typeText('actualResult', response.actual_result, 50), (response.description.length + response.expected_result.length) * 50 + 1000);
+        }
+
+        // Type out the reproduction steps if they exist
+        const reproduceStepsList = document.getElementById('reproduceStepsList');
+        if (response.reproduce_steps && response.reproduce_steps.length > 0) {
+            response.reproduce_steps.forEach((step, index) => {
+                setTimeout(() => {
+                    const li = document.createElement('li');
+                    li.innerText = step;
+                    reproduceStepsList.appendChild(li);
+                }, (response.description.length + response.expected_result.length + response.actual_result.length) * 50 + 1500 + index * 500);
+            });
         }
 
         // Type out the acceptance criteria if it exists
@@ -103,15 +131,6 @@
                 }, (response.description.length + response.expected_result.length + response.actual_result.length) * 50 + 1500 + index * 500);
             });
         }
-    </script>
-        <!-- Google tag (gtag.js) -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-VG24NV3H3S"></script>
-    <script>
-    window.dataLayer = window.dataLayer || [];
-    function gtag(){dataLayer.push(arguments);}
-    gtag('js', new Date());
-
-    gtag('config', 'G-VG24NV3H3S');
     </script>
 </body>
 </html>
