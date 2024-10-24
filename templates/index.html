@@ -16,15 +16,18 @@
         <form id="bugForm" action="/" method="POST">
             <div class="form-group">
                 <label for="bugTitle">Bug Title</label>
-                <input type="text" class="form-control" id="bugTitle" name="bugTitle" required>
+                <input type="text" class="form-control" id="bugTitle" name="bugTitle" 
+                       value="{{ bugTitle if bugTitle else '' }}" 
+                       placeholder="{{ 'Please enter a bug title' if not bugTitle else '' }}" 
+                       required>
             </div>
-            <button type="submit" class="btn btn-primary">Submit</button>
+            <button type="submit" class="btn btn-primary">Generate Bug Report</button>
         </form>
         
         <!-- Response Message -->
         <div id="responseMessage" class="mt-3">
             {% if response %}
-                <div class="alert alert-info">
+                <div class="alert alert-info" id="testCaseReport">
                     <h5>Description:</h5>
                     <p id="description"></p>
 
@@ -36,6 +39,10 @@
 
                     <h5>System Acceptance Criteria:</h5>
                     <ul id="acceptanceCriteriaList"></ul>
+                    
+                    {{ edit_1 }} <!-- Added button for creating a test case -->
+                    <button id="createTestCase" class="btn btn-success mt-3" onclick="createTestCase()" disabled>Create Test Case</button>
+                    {{ edit_2 }} <!-- End of new button -->
                 </div>  <!-- Display response from Flask -->
             {% else %}
                 <div class="alert alert-warning">
@@ -44,30 +51,74 @@
             {% endif %}
         </div>
     </div>
+
     <!-- Bootstrap JS and dependencies -->
     <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.2/dist/umd/popper.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
     <script>
-        // Check if response is defined and not None
-        {% if response %}
-            const response = {
-                description: {{ response.description|tojson|safe }},
-                expected_result: {{ response.expected_result|tojson|safe }},
-                actual_result: {{ response.actual_result|tojson|safe }},
-                system_acceptance_criteria: {{ response.system_acceptance_criteria|tojson|safe }}
-            };
-        {% else %}
-            const response = {
-                description: "",
-                expected_result: "",
-                actual_result: "",
-                system_acceptance_criteria: []
-            };
-        {% endif %}
+        const createTestCaseButton = document.getElementById('createTestCase'); // Reference to the button
 
-        // Function to simulate typing effect
-        function typeText(elementId, text, delay) {
+        // Function to create a test case and display the result
+        function createTestCase() {
+            const bugTitle = document.getElementById('bugTitle').value;  // Get the bug title from the input
+
+            // Add spinner and change button text to "Loading..."
+            createTestCaseButton.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Loading...`;
+            createTestCaseButton.disabled = true;  // Disable button to prevent multiple submissions
+
+            fetch('/create_test_case', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({ bugTitle: bugTitle })  // Send the bug title in the request body
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Restore the button text and enable it again
+                createTestCaseButton.innerHTML = 'Create Test Case';
+                createTestCaseButton.disabled = false;
+
+                // Create a new div to display the generated test case
+                const testCaseDiv = document.createElement('div');
+                testCaseDiv.classList.add('alert', 'alert-success', 'mt-3');
+
+                // Handle the steps, check if the array exists and has steps
+                const stepsList = data.steps && data.steps.length > 0
+                    ? data.steps.map(step => `<li>${step}</li>`).join('')
+                    : '<li>No steps provided</li>';
+
+                // Display the test case report with test case ID, description, steps, and expected result
+                testCaseDiv.innerHTML = `
+                    <h5>Generated Test Case:</h5>
+                    <p><strong>Test Case ID:</strong> ${data.test_case_id}</p>
+                    <p><strong>Description:</strong> ${data.description}</p>
+                    <h5>Steps:</h5>
+                    <ul>${stepsList}</ul>
+                    <p><strong>Expected Result:</strong> ${data.expected_result}</p>
+                `;
+
+                // Append the new test case report below the previous reports
+                responseMessage.appendChild(testCaseDiv);
+            })
+            .catch(error => {
+                // Restore the button text and enable it again
+                createTestCaseButton.innerHTML = 'Create Test Case';
+                createTestCaseButton.disabled = false;
+
+                console.error('Error:', error);
+                alert("An error occurred while creating the test case.");
+            });
+        }
+
+        // Check if all responses are shown, then enable the button
+        function allSectionsTyped() {
+            createTestCaseButton.disabled = false;  // Enable the button once all sections are displayed
+        }
+
+        // Function to simulate typing effect for bug report sections
+        function typeText(elementId, text, delay, callback) {
             const element = document.getElementById(elementId);
             let index = 0;
 
@@ -76,12 +127,21 @@
                     element.innerHTML += text.charAt(index);
                     index++;
                     setTimeout(type, delay);
+                } else if (callback) {
+                    callback(); // Trigger the callback once text is fully typed
                 }
             }
             type();
         }
 
-        // Only type out sections if response is not empty
+        // Safely pass response data to JavaScript using Jinja2
+        const response = {
+            description: {{ response.description | default('null', true) | tojson }},
+            expected_result: {{ response.expected_result | default('null', true) | tojson }},
+            actual_result: {{ response.actual_result | default('null', true) | tojson }},
+            system_acceptance_criteria: {{ response.system_acceptance_criteria | default('[]', true) | tojson }}
+        };
+
         if (response.description) {
             typeText('description', response.description, 50);
         }
@@ -100,8 +160,16 @@
                     const li = document.createElement('li');
                     li.innerText = criterion;
                     criteriaList.appendChild(li);
+
+                    // Check if we reached the last criterion
+                    if (index === response.system_acceptance_criteria.length - 1) {
+                        allSectionsTyped();  // Enable the button once the last criterion is typed
+                    }
                 }, (response.description.length + response.expected_result.length + response.actual_result.length) * 50 + 1500 + index * 500);
             });
+        } else {
+            // If there are no acceptance criteria, just enable the button after typing the rest
+            setTimeout(allSectionsTyped, (response.description.length + response.expected_result.length + response.actual_result.length) * 50 + 1500);
         }
     </script>
 </body>
