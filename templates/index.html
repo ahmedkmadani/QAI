@@ -16,7 +16,10 @@
         <form id="bugForm" action="/" method="POST">
             <div class="form-group">
                 <label for="bugTitle">Bug Title</label>
-                <input type="text" class="form-control" id="bugTitle" name="bugTitle" required>
+                <input type="text" class="form-control" id="bugTitle" name="bugTitle"
+                       value="{{ bugTitle if bugTitle else '' }}"
+                       placeholder="Please enter a bug title"
+                       required>
             </div>
             <button type="submit" class="btn btn-primary">Generate Bug Report</button>
         </form>
@@ -26,23 +29,36 @@
             {% if response %}
                 <div class="alert alert-info">
                     <h5>Bug Title:</h5>
-                    <p id="bugTitleDisplay"></p>
+                    <p id="bugTitleDisplay">{{ response.title }}</p>
 
-                    <h5>Description:</h5>
-                    <p id="description"></p>
+                    <div class="alert alert-info" id="testCaseReport">
+                        <h5>Description:</h5>
+                        <p id="description">{{ response.description }}</p>
 
-                    <h5>Expected Result:</h5>
-                    <p id="expectedResult"></p>
+                        <h5>Expected Result:</h5>
+                        <p id="expectedResult">{{ response.expected_result }}</p>
 
-                    <h5>Actual Result:</h5>
-                    <p id="actualResult"></p>
+                        <h5>Actual Result:</h5>
+                        <p id="actualResult">{{ response.actual_result }}</p>
 
-                    <h5>Reproduction Steps:</h5>
-                    <ul id="reproduceStepsList"></ul>
+                        <h5>Reproduction Steps:</h5>
+                        <ul id="reproduceStepsList">
+                            {% for step in response.reproduce_steps %}
+                                <li>{{ step }}</li>
+                            {% endfor %}
+                        </ul>
 
-                    <h5>System Acceptance Criteria:</h5>
-                    <ul id="acceptanceCriteriaList"></ul>
-                </div>  <!-- Display response from Flask -->
+                        <h5>System Acceptance Criteria:</h5>
+                        <ul id="acceptanceCriteriaList">
+                            {% for criterion in response.system_acceptance_criteria %}
+                                <li>{{ criterion }}</li>
+                            {% endfor %}
+                        </ul>
+
+                        <!-- Button for creating a test case -->
+                        <button id="createTestCase" class="btn btn-success mt-3" onclick="createTestCase()" disabled>Create Test Case</button>
+                    </div>
+                </div>
             {% else %}
                 <div class="alert alert-warning">
                     <p>No response available. Please submit a bug title to generate a report.</p>
@@ -56,32 +72,60 @@
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.2/dist/umd/popper.min.js"></script>
     <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
     <script>
-        // Check if response is defined and not None
-        {% if response %}
-            const response = {
-                title: {{ response.title|tojson|safe }},
-                description: {{ response.description|tojson|safe }},
-                expected_result: {{ response.expected_result|tojson|safe }},
-                actual_result: {{ response.actual_result|tojson|safe }},
-                reproduce_steps: {{ response.reproduce_steps|tojson|safe }},
-                system_acceptance_criteria: {{ response.system_acceptance_criteria|tojson|safe }}
-            };
-        {% else %}
-            const response = {
-                title: "",
-                description: "",
-                expected_result: "",
-                actual_result: "",
-                reproduce_steps: [],
-                system_acceptance_criteria: []
-            };
-        {% endif %}
+        const createTestCaseButton = document.getElementById('createTestCase');
 
-        // Function to simulate typing effect
-        function typeText(elementId, text, delay) {
+        // Function to create a test case
+        function createTestCase() {
+            const bugTitle = document.getElementById('bugTitle').value;
+
+            createTestCaseButton.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Loading...`;
+            createTestCaseButton.disabled = true;
+
+            fetch('/create_test_case', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({ bugTitle: bugTitle })
+            })
+            .then(response => response.json())
+            .then(data => {
+                createTestCaseButton.innerHTML = 'Create Test Case';
+                createTestCaseButton.disabled = false;
+
+                const testCaseDiv = document.createElement('div');
+                testCaseDiv.classList.add('alert', 'alert-success', 'mt-3');
+
+                const stepsList = data.steps && data.steps.length > 0
+                    ? data.steps.map(step => `<li>${step}</li>`).join('')
+                    : '<li>No steps provided</li>';
+
+                testCaseDiv.innerHTML = `
+                    <h5>Generated Test Case:</h5>
+                    <p><strong>Test Case ID:</strong> ${data.test_case_id}</p>
+                    <p><strong>Description:</strong> ${data.description}</p>
+                    <h5>Steps:</h5>
+                    <ul>${stepsList}</ul>
+                    <p><strong>Expected Result:</strong> ${data.expected_result}</p>
+                `;
+
+                responseMessage.appendChild(testCaseDiv);
+            })
+            .catch(error => {
+                createTestCaseButton.innerHTML = 'Create Test Case';
+                createTestCaseButton.disabled = false;
+                console.error('Error:', error);
+                alert("An error occurred while creating the test case.");
+            });
+        }
+
+        function allSectionsTyped() {
+            createTestCaseButton.disabled = false;
+        }
+
+        function typeText(elementId, text, delay, callback) {
             const element = document.getElementById(elementId);
             let index = 0;
-
             function type() {
                 if (index < text.length) {
                     element.innerHTML += text.charAt(index);
@@ -92,12 +136,15 @@
             type();
         }
 
-        // Display the bug title
-        if (response.title) {
-            typeText('bugTitleDisplay', response.title, 50);
-        }
+        // Safely pass response data
+        const response = {
+            description: {{ response.description | default('null', true) | tojson }},
+            expected_result: {{ response.expected_result | default('null', true) | tojson }},
+            actual_result: {{ response.actual_result | default('null', true) | tojson }},
+            reproduce_steps: {{ response.reproduce_steps | default('[]', true) | tojson }},
+            system_acceptance_criteria: {{ response.system_acceptance_criteria | default('[]', true) | tojson }}
+        };
 
-        // Only type out sections if response is not empty
         if (response.description) {
             typeText('description', response.description, 50);
         }
@@ -108,7 +155,6 @@
             setTimeout(() => typeText('actualResult', response.actual_result, 50), (response.description.length + response.expected_result.length) * 50 + 1000);
         }
 
-        // Type out the reproduction steps if they exist
         const reproduceStepsList = document.getElementById('reproduceStepsList');
         if (response.reproduce_steps && response.reproduce_steps.length > 0) {
             response.reproduce_steps.forEach((step, index) => {
@@ -120,7 +166,6 @@
             });
         }
 
-        // Type out the acceptance criteria if it exists
         const criteriaList = document.getElementById('acceptanceCriteriaList');
         if (response.system_acceptance_criteria && response.system_acceptance_criteria.length > 0) {
             response.system_acceptance_criteria.forEach((criterion, index) => {
@@ -128,8 +173,14 @@
                     const li = document.createElement('li');
                     li.innerText = criterion;
                     criteriaList.appendChild(li);
+
+                    if (index === response.system_acceptance_criteria.length - 1) {
+                        allSectionsTyped();
+                    }
                 }, (response.description.length + response.expected_result.length + response.actual_result.length) * 50 + 1500 + index * 500);
             });
+        } else {
+            setTimeout(allSectionsTyped, (response.description.length + response.expected_result.length + response.actual_result.length) * 50 + 1500);
         }
     </script>
 </body>
