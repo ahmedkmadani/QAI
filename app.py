@@ -25,21 +25,31 @@ def hello_world():  # put application's code here
 
 def generate_bug_report(title):
     prompt = f"""
-    You are a software testing assistant. Based on the following bug report title, generate the remaining bug report details in JSON format:
-    
-    Bug Report Title: {title}
+    You are helping to test software. Please fill in the details for a bug report. Use simple and clear language.
 
-    Format the response as:
+    Bug report title: {title}
+
+    Fill in the following information:
     {{
-        "description": "Your description here",
-        "expected_result": "Your expected result here",
-        "actual_result": "Your actual result here",
+        "title": "{title}",
+        "description": "What happened? (Describe the issue)",
+        "expected_result": "What should happen? (How should it work?)",
+        "actual_result": "What actually happened? (What did you see?)",
+        "reproduce_steps": [
+            "Step 1: What is the first thing you did?",
+            "Step 2: What did you do next?",
+            // Add more steps if needed
+        ],
         "system_acceptance_criteria": [
-            "Criteria 1",
-            "Criteria 2"
+            "Criteria 1: What should the system do?",
+            "Criteria 2: What else is required?",
+            // Add more criteria if needed
         ]
     }}
+
+    Please keep the description simple and clear.
     """
+
     
     # Call to ChatGPT API
     response = call_chatgpt_api(prompt)
